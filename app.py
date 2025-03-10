@@ -59,11 +59,37 @@ if uploaded_file is not None:
     xgb.fit(X_train, y_train)
 
     # Generate base model predictions
-    rf_preds_train = rf.predict_proba(X_train)[:, 1]
-    xgb_preds_train = xgb.predict_proba(X_train)[:, 1]
+    rf_proba_train = rf.predict_proba(X_train)
+    xgb_proba_train = xgb.predict_proba(X_train)
 
-    rf_preds_test = rf.predict_proba(X_test)[:, 1]
-    xgb_preds_test = xgb.predict_proba(X_test)[:, 1]
+    # Debug: Check shapes
+    st.write("Random Forest predict_proba shape:", rf_proba_train.shape)
+    st.write("XGBoost predict_proba shape:", xgb_proba_train.shape)
+
+    # Ensure there are two columns before accessing index 1
+    if rf_proba_train.shape[1] == 2:
+        rf_preds_train = rf_proba_train[:, 1]
+    else:
+        rf_preds_train = rf_proba_train[:, 0]  # Fallback to the only column
+
+    if xgb_proba_train.shape[1] == 2:
+        xgb_preds_train = xgb_proba_train[:, 1]
+    else:
+        xgb_preds_train = xgb_proba_train[:, 0]  # Fallback to the only column
+
+    # Repeat the same for test predictions
+    rf_proba_test = rf.predict_proba(X_test)
+    xgb_proba_test = xgb.predict_proba(X_test)
+
+    if rf_proba_test.shape[1] == 2:
+        rf_preds_test = rf_proba_test[:, 1]
+    else:
+        rf_preds_test = rf_proba_test[:, 0]
+
+    if xgb_proba_test.shape[1] == 2:
+        xgb_preds_test = xgb_proba_test[:, 1]
+    else:
+        xgb_preds_test = xgb_proba_test[:, 0]
 
     # LSTM Model
     X_train_lstm = np.expand_dims(X_train.values, axis=1)
