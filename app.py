@@ -1,154 +1,205 @@
+import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
-from xgboost import XGBClassifier
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import precision_score, recall_score, roc_auc_score, mean_squared_error
+import joblib
 import tensorflow as tf
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense
+from xgboost import XGBClassifier
 from category_encoders import TargetEncoder
-import streamlit as st
+from datetime import datetime
 
-# Streamlit App Title
-st.title("Waste Collection Prediction App")
+# Page configuration
+st.set_page_config(page_title="Waste Capacity Predictor", page_icon="🗑️", layout="wide")
 
-# Load dataset
-uploaded_file = st.file_uploader("Upload your dataset (CSV)", type=["csv"])
-if uploaded_file is not None:
-    df = pd.read_csv(uploaded_file)
+# Custom CSS for better appearance
+st.markdown("""
+    <style>
+    .main {
+        background-color: #f5f5f5;
+    }
+    .stTextInput>div>div>input {
+        background-color: #ffffff;
+    }
+    .stSelectbox>div>div>select {
+        background-color: #ffffff;
+    }
+    .css-1aumxhk {
+        background-color: #ffffff;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
-    # Convert date column to datetime
-    df['Date'] = pd.to_datetime(df['Date'])
+# Load the saved models and encoder
+@st.cache_resource
+def load_models():
+    try:
+        rf_loaded = joblib.load('random_forest_model.pkl')
+        xgb_loaded = XGBClassifier()
+        xgb_loaded.load_model('xgboost_model.json')
+        lstm_model_loaded = tf.keras.models.load_model('lstm_model.h5')
+        meta_xgb_loaded = XGBClassifier()
+        meta_xgb_loaded.load_model('meta_xgb_model.json')
+        encoder_loaded = joblib.load('target_encoder.pkl')
+        return rf_loaded, xgb_loaded, lstm_model_loaded, meta_xgb_loaded, encoder_loaded
+    except Exception as e:
+        st.error(f"Error loading models: {str(e)}")
+        return None, None, None, None, None
 
-    # Feature Engineering
-    df['DayOfWeek'] = df['Date'].dt.dayofweek  # Monday=0, Sunday=6
-    df['Month'] = df['Date'].dt.month
-    df['RollingAvgWaste'] = df.groupby('Location of Dumpster')['Volume of Waste Collected (Tonnes)'].transform(
-        lambda x: x.rolling(7, min_periods=1).mean())
-    df['PrevDayWaste'] = df.groupby('Location of Dumpster')['Volume of Waste Collected (Tonnes)'].shift(1)
+# Preprocess input data
+def preprocess_input(date, encoder, locations):
+    try:
+        # Create a DataFrame with the input date and all locations
+        data = {
+            'Date': [date] * len(locations),
+            'Location of Dumpster': locations,
+            'Frequency of Waste Collection (days)': [7] * len(locations),  # Default value
+            'Volume of Waste Collected (Kg)': [5000] * len(locations)  # Default value
+        }
+        df = pd.DataFrame(data)
+        
+        # Convert date to datetime and extract features
+        df['Date'] = pd.to_datetime(df['Date'])
+        df['DayOfWeek'] = df['Date'].dt.dayofweek
+        df['Month'] = df['Date'].dt.month
+        
+        # Apply target encoding to locations
+        df['Location of Dumpster'] = encoder.transform(df['Location of Dumpster'])
+        
+        # Drop the date column
+        df.drop(columns=['Date'], inplace=True)
+        
+        return df
+    except Exception as e:
+        st.error(f"Error in preprocessing: {str(e)}")
+        return None
 
-    # Label target variable: 1 if waste > 10 tonnes, else 0
-    df['WasteOverCapacity'] = (df['Volume of Waste Collected (Tonnes)'] > 6).astype(int)
+# Make predictions
+def predict_waste_over_capacity(input_data, rf_model, xgb_model, lstm_model, meta_model):
+    try:
+        # Base model predictions
+        rf_preds = rf_model.predict_proba(input_data)[:, 1]
+        xgb_preds = xgb_model.predict_proba(input_data)[:, 1]
+        
+        # Reshape input for LSTM
+        input_data_lstm = np.expand_dims(input_data.values, axis=1)
+        lstm_preds = lstm_model.predict(input_data_lstm).flatten()
+        
+        # Stack predictions for meta model
+        stacked_data = np.column_stack((rf_preds, xgb_preds, lstm_preds))
+        
+        # Meta model predictions
+        predictions = meta_model.predict(stacked_data)
+        
+        return predictions
+    except Exception as e:
+        st.error(f"Error in prediction: {str(e)}")
+        return None
 
-    # Apply Target Encoding to "Location of Dumpster"
-    encoder = TargetEncoder()
-    df['Location of Dumpster'] = encoder.fit_transform(df['Location of Dumpster'], df['WasteOverCapacity'])
+def main():
+    st.title("🏙️ Waste Capacity Prediction System")
+    st.markdown("""
+    This app predicts whether dumpsters at various locations will have waste over capacity 
+    on a given date based on historical data and machine learning models.
+    """)
+    
+    # Sidebar for user inputs
+    with st.sidebar:
+        st.header("Input Parameters")
+        
+        # Date input
+        input_date = st.date_input(
+            "Select a date",
+            min_value=datetime.today(),
+            value=datetime.today()
+        )
+        
+        # Location input
+        locations_input = st.text_area(
+            "Enter dumpster locations (one per line or comma-separated)",
+            "Location1, Location2, Location3"
+        )
+        
+        # Process locations input
+        if "\n" in locations_input:
+            locations = [loc.strip() for loc in locations_input.split("\n") if loc.strip()]
+        else:
+            locations = [loc.strip() for loc in locations_input.split(",") if loc.strip()]
+        
+        # Example locations button
+        if st.button("Load Example Locations"):
+            locations = ["Downtown", "Suburb A", "Industrial Zone", "Shopping District", "Residential Area B"]
+    
+    # Load models
+    with st.spinner("Loading prediction models..."):
+        rf_model, xgb_model, lstm_model, meta_model, encoder = load_models()
+    
+    if None in [rf_model, xgb_model, lstm_model, meta_model, encoder]:
+        st.error("Failed to load one or more models. Please check the model files.")
+        return
+    
+    # Display input summary
+    st.subheader("Input Summary")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown(f"**Selected Date:** {input_date.strftime('%Y-%m-%d')}")
+    with col2:
+        st.markdown(f"**Number of Locations:** {len(locations)}")
+    
+    if len(locations) > 0:
+        st.markdown("**Locations to Analyze:**")
+        for loc in locations:
+            st.markdown(f"- {loc}")
+    
+    # Make predictions when button is clicked
+    if st.button("Predict Waste Capacity", type="primary"):
+        if not locations:
+            st.warning("Please enter at least one location.")
+            return
+            
+        with st.spinner("Making predictions..."):
+            # Preprocess input data
+            input_data = preprocess_input(str(input_date), encoder, locations)
+            
+            if input_data is not None:
+                # Make predictions
+                predictions = predict_waste_over_capacity(input_data, rf_model, xgb_model, lstm_model, meta_model)
+                
+                if predictions is not None:
+                    # Display results
+                    st.subheader("Prediction Results")
+                    
+                    # Create results DataFrame
+                    results = pd.DataFrame({
+                        'Location': locations,
+                        'Waste Over Capacity': ['Yes' if pred == 1 else 'No' for pred in predictions],
+                        'Risk Level': ['High' if pred == 1 else 'Low' for pred in predictions]
+                    })
+                    
+                    # Color coding for results
+                    def color_risk(val):
+                        color = 'red' if val == 'High' else 'green'
+                        return f'color: {color}'
+                    
+                    styled_results = results.style.applymap(color_risk, subset=['Risk Level'])
+                    
+                    # Display styled table
+                    st.dataframe(styled_results, hide_index=True, use_container_width=True)
+                    
+                    # Summary statistics
+                    num_at_risk = sum(predictions)
+                    st.metric("Total Locations at Risk", f"{num_at_risk} / {len(locations)}")
+                    
+                    # Show warning if any locations are at risk
+                    if num_at_risk > 0:
+                        st.warning(f"⚠️ {num_at_risk} location(s) are predicted to have waste over capacity. Please schedule additional collections.")
+                    
+                    # Download button for results
+                    csv = results.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        label="Download Predictions as CSV",
+                        data=csv,
+                        file_name=f"waste_predictions_{input_date}.csv",
+                        mime="text/csv"
+                    )
 
-    # Drop unnecessary columns
-    df.drop(columns=['Date', 'Types of Waste', 'Operational Schedule'], inplace=True)
-
-    # Drop rows with NaN values (from shifting)
-    df.dropna(inplace=True)
-
-    # Splitting Data
-    X = df.drop(columns=['WasteOverCapacity'])  # Features
-    y = df['WasteOverCapacity']  # Target
-
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False, random_state=42)
-
-    # Base Models
-    rf = RandomForestClassifier(n_estimators=100, random_state=42)
-    xgb = XGBClassifier(n_estimators=100, use_label_encoder=False, eval_metric='logloss')
-
-    # Train base models
-    rf.fit(X_train, y_train)
-    xgb.fit(X_train, y_train)
-
-    # Generate base model predictions
-    rf_proba_train = rf.predict_proba(X_train)
-    xgb_proba_train = xgb.predict_proba(X_train)
-
-    # Debug: Check shapes
-    st.write("Random Forest predict_proba shape:", rf_proba_train.shape)
-    st.write("XGBoost predict_proba shape:", xgb_proba_train.shape)
-
-    # Ensure there are two columns before accessing index 1
-    if rf_proba_train.shape[1] == 2:
-        rf_preds_train = rf_proba_train[:, 1]
-    else:
-        rf_preds_train = rf_proba_train[:, 0]  # Fallback to the only column
-
-    if xgb_proba_train.shape[1] == 2:
-        xgb_preds_train = xgb_proba_train[:, 1]
-    else:
-        xgb_preds_train = xgb_proba_train[:, 0]  # Fallback to the only column
-
-    # Repeat the same for test predictions
-    rf_proba_test = rf.predict_proba(X_test)
-    xgb_proba_test = xgb.predict_proba(X_test)
-
-    if rf_proba_test.shape[1] == 2:
-        rf_preds_test = rf_proba_test[:, 1]
-    else:
-        rf_preds_test = rf_proba_test[:, 0]
-
-    if xgb_proba_test.shape[1] == 2:
-        xgb_preds_test = xgb_proba_test[:, 1]
-    else:
-        xgb_preds_test = xgb_proba_test[:, 0]
-
-    # LSTM Model
-    X_train_lstm = np.expand_dims(X_train.values, axis=1)
-    X_test_lstm = np.expand_dims(X_test.values, axis=1)
-
-    lstm_model = Sequential([
-        LSTM(50, return_sequences=False, input_shape=(1, X_train.shape[1])),
-        Dense(1, activation='sigmoid')
-    ])
-
-    lstm_model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
-    lstm_model.fit(X_train_lstm, y_train, epochs=10, batch_size=32, verbose=1)
-
-    lstm_preds_train = lstm_model.predict(X_train_lstm).flatten()
-    lstm_preds_test = lstm_model.predict(X_test_lstm).flatten()
-
-    # Combine Base Model Predictions for Meta Model
-    stacked_train = np.column_stack((rf_preds_train, xgb_preds_train, lstm_preds_train))
-    stacked_test = np.column_stack((rf_preds_test, xgb_preds_test, lstm_preds_test))
-
-    # Meta Models
-    meta_lr = LogisticRegression()
-    meta_xgb = XGBClassifier(n_estimators=50, use_label_encoder=False, eval_metric='logloss')
-
-    # Train Meta Models
-    meta_lr.fit(stacked_train, y_train)
-    meta_xgb.fit(stacked_train, y_train)
-
-    # Predictions from Meta Models
-    meta_lr_preds = meta_lr.predict(stacked_test)
-    meta_xgb_preds = meta_xgb.predict(stacked_test)
-
-    # Evaluation Metrics
-    st.subheader("Model Evaluation Metrics")
-    st.write("**Logistic Regression Meta Model:**")
-    st.write("Precision:", precision_score(y_test, meta_lr_preds))
-    st.write("Recall:", recall_score(y_test, meta_lr_preds))
-    st.write("ROC-AUC:", roc_auc_score(y_test, meta_lr_preds))
-    st.write("RMSE:", np.sqrt(mean_squared_error(y_test, meta_lr_preds)))
-
-    st.write("\n**XGBoost Meta Model:**")
-    st.write("Precision:", precision_score(y_test, meta_xgb_preds))
-    st.write("Recall:", recall_score(y_test, meta_xgb_preds))
-    st.write("ROC-AUC:", roc_auc_score(y_test, meta_xgb_preds))
-    st.write("RMSE:", np.sqrt(mean_squared_error(y_test, meta_xgb_preds)))
-
-    # Predict future waste collection locations
-    st.subheader("Predictions on Test Data")
-    future_predictions = meta_xgb.predict(stacked_test)
-    df_test = pd.DataFrame({'Actual': y_test, 'Predicted': future_predictions})
-    st.write(df_test.head())
-
-    # Plot actual vs predicted
-    st.subheader("Actual vs Predicted")
-    fig, ax = plt.subplots()
-    sns.scatterplot(x=y_test, y=future_predictions, ax=ax)
-    ax.set_xlabel("Actual")
-    ax.set_ylabel("Predicted")
-    st.pyplot(fig)
-
-else:
-    st.write("Please upload a CSV file to proceed.")
+if __name__ == "__main__":
+    main()
