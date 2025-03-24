@@ -1,7 +1,6 @@
 pandas
 numpy
 streamlit
-tensorflow
 scikit-learn
 xgboost
 category_encoders
@@ -19,6 +18,7 @@ libclang
 opt-einsum
 packaging
 six
+tensorflow==2.12.1  # Downgraded from 2.13.0
 tensorboard
 tensorflow-estimator
 tensorflow-io-gcs-filesystem
