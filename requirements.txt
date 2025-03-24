@@ -1,33 +1,36 @@
-# Core packages with pinned versions for compatibility
-numpy==1.23.5  # Must be <1.24 to avoid _core error
-tensorflow==2.12.1  # Compatible with numpy 1.23.x
-pandas
+# Core numerical computing stack
+numpy==1.23.5  # Critical - must stay at 1.23.x
+tensorflow==2.12.1  # Must match numpy 1.23.x
+pandas==1.5.3  # Compatible with numpy 1.23.x
 
-# Other ML packages with compatible versions
-scikit-learn
-xgboost
-category_encoders
-joblib
+# ML ecosystem
+scikit-learn==1.2.2  # Last version fully compatible with numpy 1.23.x
+xgboost==1.7.6
+category_encoders==2.6.1
+joblib==1.2.0
 
-# TensorFlow ecosystem
-keras
-tensorboard
-tensorflow-estimator
-protobuf
+# TensorFlow dependencies
+keras==2.12.0
+tensorboard==2.12.2
+tensorflow-estimator==2.12.0
+protobuf==3.20.3  # Important - newer versions cause issues
 
-# Supporting packages
-absl-py
-astunparse
-flatbuffers
-gast
-google-pasta
-grpcio
-h5py
-libclang
-opt-einsum
-packaging
-six
-termcolor
-typing-extensions==4.5.0
-wheel
-wrapt
+# Required supporting packages
+absl-py==1.4.0
+astunparse==1.6.3
+flatbuffers==23.5.26
+gast==0.4.0
+google-pasta==0.2.0
+grpcio==1.56.2
+h5py==3.9.0  # Critical for model loading
+libclang==16.0.6
+opt-einsum==3.3.0
+packaging==23.1
+six==1.16.0
+termcolor==2.3.0
+typing-extensions==4.5.0  # Must be <4.6.0 for TF 2.12
+wheel==0.40.0
+wrapt==1.15.0
+
+# Streamlit (less version sensitive)
+streamlit>=1.22.0,<2.0.0
