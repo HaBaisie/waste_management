@@ -31,3 +31,9 @@ termcolor==2.3.0
 typing-extensions==4.5.0
 wheel==0.40.0
 wrapt==1.14.1
+
+# Streamlit with constrained dependencies to prevent upgrades
+streamlit==1.22.0
+pygments==2.11.2  # Pinned to prevent upgrade
+markdown-it-py==2.2.0  # Pinned to prevent upgrade
+mdurl==0.1.0  # Pinned to prevent upgrade
