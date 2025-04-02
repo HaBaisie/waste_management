@@ -1,39 +1,36 @@
 # Core numerical stack
-numpy==1.23.5
-tensorflow==2.12.1
-pandas==1.5.3
+numpy
+tensorflow
+pandas
 
 # ML ecosystem
-scikit-learn==1.2.2
-xgboost==1.7.6
-category_encoders==2.6.1
-joblib==1.2.0
+scikit-learn
+xgboost
+category_encoders
+joblib
 
-# TensorFlow dependencies - carefully pinned
-keras==2.12.0
-tensorboard==2.12.2
-tensorflow-estimator==2.12.0
-protobuf==3.20.3
+# TensorFlow dependencies
+keras
+tensorboard
+tensorflow-estimator
+protobuf
 
-# Supporting packages with exact versions
-absl-py==1.4.0
-astunparse==1.6.3
-flatbuffers==23.5.26
-gast==0.4.0
-google-pasta==0.2.0
-grpcio==1.56.2
-h5py==3.9.0
-libclang==16.0.6
-opt-einsum==3.3.0
-packaging==23.1
-six==1.16.0
-termcolor==2.3.0
-typing-extensions==4.5.0
-wheel==0.40.0
-wrapt==1.14.1
+# Supporting packages
+absl-py
+astunparse
+flatbuffers
+gast
+google-pasta
+grpcio
+h5py
+libclang
+opt-einsum
+packaging
+six
+termcolor
+typing-extensions
+wheel
+wrapt
 
-# Streamlit with constrained dependencies to prevent upgrades
-streamlit==1.22.0
-pygments==2.11.2  # Pinned to prevent upgrade
-markdown-it-py==2.2.0  # Pinned to prevent upgrade
-mdurl==0.1.0  # Pinned to prevent upgrade
+# Optional web interface
+streamlit
