@@ -28,9 +28,6 @@ opt-einsum==3.3.0
 packaging==23.1
 six==1.16.0
 termcolor==2.3.0
-typing-extensions==4.5.0  # Must stay at 4.5.0 for TF 2.12
+typing-extensions==4.5.0
 wheel==0.40.0
-wrapt==1.14.1  # Changed from 1.15.0 to meet TF's requirement
-
-# Streamlit with compatible range
-streamlit>=1.22.0,<1.43.0  # Avoiding 1.43.2 which pulls newer deps
+wrapt==1.14.1
