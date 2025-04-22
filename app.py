@@ -170,7 +170,7 @@ def main():
                     # Create results DataFrame
                     results = pd.DataFrame({
                         'Location': locations,
-                        'Waste Over Capacity': ['Yes' if pred == 1 else 'No' for pred in predictions],
+                        'Waste Over flow': ['Yes' if pred == 1 else 'No' for pred in predictions],
                         'Risk Level': ['High' if pred == 1 else 'Low' for pred in predictions]
                     })
                     
