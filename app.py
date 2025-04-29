@@ -28,6 +28,13 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
+# Predefined locations
+PREDEFINED_LOCATIONS = [
+    'Owode ede', 'Abere', 'Old Garage', 'Alekuwodo', 'Odi olowo', 'Ilesha Garage',
+    'Ilesha Road', 'Oja Oba', 'Station Road', 'Dada Estate', 'Dele Yes Sir', 'West Byebass',
+    'Testing Ground', 'Stadium', 'Power Line', 'Kobo', 'Ota Efun', 'Aregbe', 'Igbona', 'MDS'
+]
+
 # Load the saved models and encoder
 @st.cache_resource
 def load_models():
@@ -112,21 +119,16 @@ def main():
             value=datetime.today()
         )
         
-        # Location input
-        locations_input = st.text_area(
-            "Enter dumpster locations (one per line or comma-separated)",
-            "Location1, Location2, Location3"
+        # Location input - changed to multiselect dropdown
+        selected_locations = st.multiselect(
+            "Select dumpster locations",
+            PREDEFINED_LOCATIONS,
+            default=PREDEFINED_LOCATIONS[:3]  # Default to first 3 locations
         )
         
-        # Process locations input
-        if "\n" in locations_input:
-            locations = [loc.strip() for loc in locations_input.split("\n") if loc.strip()]
-        else:
-            locations = [loc.strip() for loc in locations_input.split(",") if loc.strip()]
-        
         # Example locations button
-        if st.button("Load Example Locations"):
-            locations = ["Downtown", "Suburb A", "Industrial Zone", "Shopping District", "Residential Area B"]
+        if st.button("Select All Locations"):
+            selected_locations = PREDEFINED_LOCATIONS
     
     # Load models
     with st.spinner("Loading prediction models..."):
@@ -142,22 +144,22 @@ def main():
     with col1:
         st.markdown(f"**Selected Date:** {input_date.strftime('%Y-%m-%d')}")
     with col2:
-        st.markdown(f"**Number of Locations:** {len(locations)}")
+        st.markdown(f"**Number of Locations:** {len(selected_locations)}")
     
-    if len(locations) > 0:
-        st.markdown("**Locations to Analyze:**")
-        for loc in locations:
+    if len(selected_locations) > 0:
+        st.markdown("**Selected Locations:**")
+        for loc in selected_locations:
             st.markdown(f"- {loc}")
     
     # Make predictions when button is clicked
     if st.button("Predict Waste Capacity", type="primary"):
-        if not locations:
-            st.warning("Please enter at least one location.")
+        if not selected_locations:
+            st.warning("Please select at least one location.")
             return
             
         with st.spinner("Making predictions..."):
             # Preprocess input data
-            input_data = preprocess_input(str(input_date), encoder, locations)
+            input_data = preprocess_input(str(input_date), encoder, selected_locations)
             
             if input_data is not None:
                 # Make predictions
@@ -169,7 +171,7 @@ def main():
                     
                     # Create results DataFrame
                     results = pd.DataFrame({
-                        'Location': locations,
+                        'Location': selected_locations,
                         'Waste Over flow': ['Yes' if pred == 1 else 'No' for pred in predictions],
                         'Risk Level': ['High' if pred == 1 else 'Low' for pred in predictions]
                     })
@@ -186,7 +188,7 @@ def main():
                     
                     # Summary statistics
                     num_at_risk = sum(predictions)
-                    st.metric("Total Locations at Risk", f"{num_at_risk} / {len(locations)}")
+                    st.metric("Total Locations at Risk", f"{num_at_risk} / {len(selected_locations)}")
                     
                     # Show warning if any locations are at risk
                     if num_at_risk > 0:
